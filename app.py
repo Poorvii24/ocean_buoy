@@ -1,5 +1,5 @@
 # --- 1. SETUP & INSTALLATION ---
-!pip install -q streamlit pyngrok
+#!pip install -q streamlit pyngrok
 
 # --- 2. AUTHENTICATE NGROK ---
 from pyngrok import ngrok
