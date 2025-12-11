@@ -17,18 +17,36 @@ st.set_page_config(
     page_icon="🌍"
 )
 
+# Custom CSS for High-Visibility Metrics
 st.markdown("""
     <style>
     .stApp {
         background-color: #0E1117;
         color: #FAFAFA;
     }
-    .stMetric {
-        background-color: #262730;
-        border: 1px solid #464B5C;
-        padding: 10px;
-        border-radius: 5px;
+    .metric-card {
+        background-color: #1E2129;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        border: 1px solid #30333F;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        margin-bottom: 20px;
     }
+    .metric-value {
+        font-size: 32px;
+        font-weight: 700;
+        margin-top: 5px;
+    }
+    .metric-label {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #A0A0A0;
+    }
+    .text-green { color: #00CC96; }
+    .text-red { color: #FF4B4B; }
+    .text-blue { color: #29B5E8; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -106,47 +124,37 @@ display_data, s_idx, e_idx = inject_anomalies(raw_data, anomaly_choice)
 scaler = MinMaxScaler()
 scaled_data = scaler.fit_transform(display_data.reshape(-1, 1))
 
-# --- MAP SECTION (GLOBAL UPGRADE) ---
+# --- MAP SECTION ---
 st.markdown("### 1. Live Global Map")
 
-# 1. Generate 300 Buoys across major oceans (approximate coords)
-np.random.seed(101) # Fixed seed
-
-# Pacific Cluster
+# Generate 300 Buoys
+np.random.seed(101) 
 lat_pac = np.random.uniform(-40, 50, 120)
 lon_pac = np.random.uniform(-180, -100, 120)
-
-# Atlantic Cluster
 lat_atl = np.random.uniform(-40, 60, 100)
 lon_atl = np.random.uniform(-60, 0, 100)
-
-# Indian Ocean Cluster
 lat_ind = np.random.uniform(-30, 20, 80)
 lon_ind = np.random.uniform(50, 100, 80)
 
-# Combine them all
 all_lats = np.concatenate([lat_pac, lat_atl, lat_ind])
 all_lons = np.concatenate([lon_pac, lon_atl, lon_ind])
 n_buoys = len(all_lats)
 
 status = ["Healthy"] * n_buoys
-colors = [[0, 255, 128, 140]] * n_buoys # Teal Green, semi-transparent
-sizes = [80000] * n_buoys # Standard size
+colors = [[0, 255, 128, 140]] * n_buoys 
+sizes = [80000] * n_buoys 
 
-# 2. Assign the "Target Buoy" (Index 0 in Pacific)
 if anomaly_choice != "None (Healthy)":
-    # If anomaly exists, make Buoy #0 RED and HUGE
     status[0] = f"CRITICAL: {anomaly_choice}"
-    colors[0] = [255, 0, 0, 255] # Bright Red
-    sizes[0] = 500000 # Massive size so it stands out on world map
+    colors[0] = [255, 0, 0, 255] 
+    sizes[0] = 500000 
     target_name = "PACIFIC-BUOY-001"
 else:
     status[0] = "Monitored (Healthy)"
-    colors[0] = [0, 255, 0, 255] # Bright Green
+    colors[0] = [0, 255, 0, 255] 
     sizes[0] = 150000 
     target_name = "PACIFIC-BUOY-001"
 
-# 3. Create DataFrame
 map_df = pd.DataFrame({
     "lat": all_lats,
     "lon": all_lons,
@@ -155,7 +163,6 @@ map_df = pd.DataFrame({
     "size": sizes
 })
 
-# 4. Render Map with PyDeck
 layer = pdk.Layer(
     "ScatterplotLayer",
     map_df,
@@ -166,7 +173,6 @@ layer = pdk.Layer(
     auto_highlight=True
 )
 
-# Zoomed out view to see the whole world
 view_state = pdk.ViewState(latitude=0, longitude=-120, zoom=0.8, pitch=0)
 
 tooltip = {
@@ -174,12 +180,7 @@ tooltip = {
     "style": {"backgroundColor": "black", "color": "white"}
 }
 
-st.pydeck_chart(pdk.Deck(
-    layers=[layer], 
-    initial_view_state=view_state,
-    tooltip=tooltip,
-    map_style=None
-))
+st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip=tooltip))
 
 # --- LIVE CHART SECTION ---
 st.markdown(f"### 2. Live Telemetry: {target_name}")
@@ -225,12 +226,40 @@ if st.button("🛡️ Run Global Diagnostics", type="primary"):
         anomalies = test_mae > threshold
         num_anomalies = np.sum(anomalies)
         
-        # Metrics
+        # --- NEW HIGHLIGHTED METRICS ---
         m1, m2, m3 = st.columns(3)
-        m1.metric("Global Threshold", f"{threshold:.4f}")
-        m2.metric("Max Deviation", f"{np.max(test_mae):.4f}")
-        m3.metric("Anomalies Found", f"{num_anomalies}", delta_color="inverse")
         
+        # Card 1: Threshold (Blue)
+        with m1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Global Threshold</div>
+                <div class="metric-value text-blue">{threshold:.4f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Card 2: Max Deviation (Dynamically Colored)
+        # If max deviation is crazy high, make it red, else green
+        dev_color = "text-red" if np.max(test_mae) > threshold else "text-green"
+        with m2:
+             st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Max Deviation</div>
+                <div class="metric-value {dev_color}">{np.max(test_mae):.4f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Card 3: Anomalies (Red if danger, Green if safe)
+        alert_color = "text-red" if num_anomalies > 0 else "text-green"
+        with m3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Anomalies Found</div>
+                <div class="metric-value {alert_color}">{num_anomalies}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        # -------------------------------
+
         # Visuals
         c1, c2 = st.columns([2, 1])
         
